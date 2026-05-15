@@ -1,0 +1,23 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f4f6f8; }
+.app { max-width: 1400px; margin: 0 auto; padding: 20px; color: #1a1a1a; }
+.header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.header h1 { margin: 0; font-size: 1.4rem; }
+.searchForm { display: flex; gap: 8px; }
+.searchForm input { width: 260px; max-width: 70vw; padding: 8px 10px; }
+.searchForm button { padding: 8px 12px; cursor: pointer; }
+.layout { margin-top: 16px; display: grid; gap: 12px; grid-template-columns: 1.1fr 1.8fr 1.1fr; }
+.panel { background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.05); min-height: 200px; }
+.panel h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.problemList, .statusList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.problemList button { width: 100%; text-align: left; border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; padding: 8px; cursor: pointer; display: grid; gap: 2px; }
+.problemList button.active { border-color: #2a7dff; background: #eff5ff; }
+.problemList small { color: #6d6d6d; }
+.pager { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+.pager button { padding: 6px 10px; cursor: pointer; }
+.meta { color: #555; margin-bottom: 10px; }
+.detail section { border-top: 1px solid #f0f0f0; padding-top: 10px; margin-top: 10px; }
+.detail h4 { margin: 0 0 6px; }
+.statusList li { border: 1px solid #ececec; border-radius: 8px; padding: 8px; display: grid; gap: 2px; font-size: 0.92rem; }
+.error { margin-top: 10px; background: #ffe6e6; color: #a10000; border: 1px solid #ffcccc; border-radius: 8px; padding: 8px 10px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }

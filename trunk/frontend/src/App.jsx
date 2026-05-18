@@ -3,14 +3,19 @@ import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1'
 
-function fetchJson(url) {
-  return fetch(url, { credentials: 'include' }).then(async (res) => {
+function fetchJson(url, options) {
+  return fetch(url, { credentials: 'include', ...(options || {}) }).then(async (res) => {
     const data = await res.json().catch(() => ({}))
     if (!res.ok || data?.ok === false) {
       throw new Error(data?.error || `Request failed (${res.status})`)
     }
     return data
   })
+}
+
+function formatText(text) {
+  if (!text) return '-'
+  return text
 }
 
 function App() {
@@ -22,6 +27,11 @@ function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [problemDetail, setProblemDetail] = useState(null)
   const [statusItems, setStatusItems] = useState([])
+  const [languages, setLanguages] = useState([])
+  const [language, setLanguage] = useState('1')
+  const [source, setSource] = useState('')
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState('')
   const [loadingProblems, setLoadingProblems] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [loadingStatus, setLoadingStatus] = useState(false)
@@ -29,6 +39,17 @@ function App() {
 
   const pageSize = 20
   const totalPages = useMemo(() => Math.max(1, Math.ceil(problemTotal / pageSize)), [problemTotal])
+
+  const refreshStatus = () => {
+    const params = new URLSearchParams({ page: '1', page_size: '12' })
+    if (selectedId) params.set('problem_id', String(selectedId))
+
+    setLoadingStatus(true)
+    fetchJson(`${API_BASE}/status.php?${params.toString()}`)
+      .then((data) => setStatusItems(data.items || []))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoadingStatus(false))
+  }
 
   useEffect(() => {
     let active = true
@@ -40,11 +61,18 @@ function App() {
     fetchJson(`${API_BASE}/problems.php?${params.toString()}`)
       .then((data) => {
         if (!active) return
-        setProblems(data.items || [])
+        const items = data.items || []
+        setProblems(items)
         setProblemTotal(data.total || 0)
-        if (!selectedId && data.items?.length) {
-          setSelectedId(data.items[0].problem_id)
+
+        if (!items.length) {
+          setSelectedId(null)
+          setProblemDetail(null)
+          return
         }
+
+        const exists = selectedId && items.some((p) => p.problem_id === selectedId)
+        if (!exists) setSelectedId(items[0].problem_id)
       })
       .catch((e) => active && setError(e.message))
       .finally(() => active && setLoadingProblems(false))
@@ -53,6 +81,24 @@ function App() {
       active = false
     }
   }, [page, query, selectedId])
+
+  useEffect(() => {
+    let active = true
+    fetchJson(`${API_BASE}/languages.php`)
+      .then((data) => {
+        if (!active) return
+        const enabled = (data.items || []).filter((l) => l.enabled)
+        setLanguages(enabled)
+        if (enabled.length > 0) {
+          setLanguage(String(enabled[0].id))
+        }
+      })
+      .catch((e) => active && setError(e.message))
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!selectedId) return
@@ -74,30 +120,38 @@ function App() {
   }, [selectedId])
 
   useEffect(() => {
-    let active = true
-    setLoadingStatus(true)
-    setError('')
-
-    const params = new URLSearchParams({ page: '1', page_size: '12' })
-    if (selectedId) params.set('problem_id', String(selectedId))
-
-    fetchJson(`${API_BASE}/status.php?${params.toString()}`)
-      .then((data) => {
-        if (!active) return
-        setStatusItems(data.items || [])
-      })
-      .catch((e) => active && setError(e.message))
-      .finally(() => active && setLoadingStatus(false))
-
-    return () => {
-      active = false
-    }
+    refreshStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
   function onSearchSubmit(e) {
     e.preventDefault()
     setPage(1)
     setQuery(search.trim())
+  }
+
+  function onSubmitCode(e) {
+    e.preventDefault()
+    if (!selectedId) return
+    setSubmitLoading(true)
+    setSubmitMessage('')
+    setError('')
+
+    fetchJson(`${API_BASE}/submit.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        problem_id: selectedId,
+        language: Number(language),
+        source,
+      }),
+    })
+      .then((data) => {
+        setSubmitMessage(`제출 완료: #${data.solution_id}`)
+        refreshStatus()
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setSubmitLoading(false))
   }
 
   return (
@@ -116,6 +170,7 @@ function App() {
       </header>
 
       {error ? <div className="error">{error}</div> : null}
+      {submitMessage ? <div className="success">{submitMessage}</div> : null}
 
       <section className="layout">
         <aside className="panel">
@@ -152,15 +207,23 @@ function App() {
               <div className="meta">시간 제한: {problemDetail.time_limit} ms / 메모리 제한: {problemDetail.memory_limit} KB</div>
               <section>
                 <h4>Description</h4>
-                <div dangerouslySetInnerHTML={{ __html: problemDetail.description || '' }} />
+                <pre className="contentBlock">{formatText(problemDetail.description)}</pre>
               </section>
               <section>
                 <h4>Input</h4>
-                <div dangerouslySetInnerHTML={{ __html: problemDetail.input || '' }} />
+                <pre className="contentBlock">{formatText(problemDetail.input)}</pre>
               </section>
               <section>
                 <h4>Output</h4>
-                <div dangerouslySetInnerHTML={{ __html: problemDetail.output || '' }} />
+                <pre className="contentBlock">{formatText(problemDetail.output)}</pre>
+              </section>
+              <section>
+                <h4>Sample Input</h4>
+                <pre className="contentBlock">{formatText(problemDetail.sample_input)}</pre>
+              </section>
+              <section>
+                <h4>Sample Output</h4>
+                <pre className="contentBlock">{formatText(problemDetail.sample_output)}</pre>
               </section>
             </div>
           ) : (
@@ -169,7 +232,31 @@ function App() {
         </article>
 
         <aside className="panel">
-          <h2>최근 제출</h2>
+          <h2>코드 제출</h2>
+          <form className="submitForm" onSubmit={onSubmitCode}>
+            <label>
+              언어
+              <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+                {languages.map((lang) => (
+                  <option key={lang.id} value={lang.id}>{lang.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              소스코드
+              <textarea
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder="코드를 입력하세요"
+                rows={12}
+              />
+            </label>
+            <button type="submit" disabled={submitLoading || !selectedId || !source.trim()}>
+              {submitLoading ? '제출 중...' : '제출'}
+            </button>
+          </form>
+
+          <h2 className="statusTitle">최근 제출</h2>
           {loadingStatus ? <p>Loading...</p> : null}
           <ul className="statusList">
             {statusItems.map((s) => (
